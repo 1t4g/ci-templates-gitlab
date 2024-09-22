@@ -1,0 +1,32 @@
+stages:
+  - build
+  - push
+
+before_script:
+  - echo $GCLOUD_SERVICE_KEY | base64 -d > ${CI_PROJECT_DIR}/keyfile.json
+  - gcloud auth activate-service-account --key-file ${CI_PROJECT_DIR}/keyfile.json
+  - gcloud --quiet config set project <your-project-id>
+  - gcloud auth configure-docker <your-region>-docker.pkg.dev
+
+build:
+  stage: build
+  script:
+    - mvn clean package
+    - mvn deploy
+
+build-docker-image:
+  stage: build
+  script:
+    - docker build -t <your-region>-docker.pkg.dev/<your-project-id>/<your-repo-name>/<your-app>:latest .
+    - docker push <your-region>-docker.pkg.dev/<your-project-id>/<your-repo-name>/<your-app>:latest
+
+push-artifact:
+  stage: push
+  script:
+    - gcloud artifacts repositories create <your-repo-name> --repository-format maven --location=<your-region>
+    - mvn deploy -DrepositoryId=artifact-registry -Durl=https://<your-region>-maven.pkg.dev/<your-project-id>/<your-repo-name>
+
+push-docker:
+  stage: push
+  script:
+    - docker push <your-region>-docker.pkg.dev/<your-project-id>/<your-repo-name>/<your-app>:latest
